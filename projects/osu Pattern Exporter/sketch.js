@@ -94,7 +94,7 @@ function draw() {
   activeObjects.forEach((obj, i) => {
     let combo = findCombo(newCombo, obj.time);
     let ratio = i / (activeObjects.length - 1);
-    let circleAlpha = round(ratio * 128 + 127);
+    let circleAlpha = round(ratio * 65 + 190);
 
     // Draw slider
     if (obj.type == 'slider') {
@@ -112,7 +112,7 @@ function draw() {
     // Calculate the combo number as a string
     let comboStr = obj.combo.toString();
 
-    // Calculate the spacing between digits based on hitCircleOverlap and the width of the number images (298)
+    // Calculate the spacing between digits based on hitCircleOverlap and the width of the number images (149)
     let spacing = r - (hitCircleOverlap * r / 149); // Scale hitCircleOverlap based on r
 
     // Calculate the width of each digit image
