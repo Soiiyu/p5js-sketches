@@ -1,4 +1,4 @@
-let input, map, hitobjects, cs, start, end, loadMap, colorOffset, newCombo, gradiant, approachSwitch, followPoint, g1, g2, approachOpacity;
+let input, map, hitobjects, cs, start, end, loadMap, colorOffset, newCombo, gradiant, approachSwitch, followPoint, localCombo, g1, g2, approachOpacity;
 let hitcircle, overlay, numbers, approach, sliderCanvas;
 let colors = [
   [255, 242, 140],
@@ -25,6 +25,7 @@ function setup() {
   colorOffset = createButton('Color Offset')
   approachOpacity = createSlider(0, 255, 64)
   gradiant = createCheckbox('Gradiant', false)
+  localCombo = createCheckbox('Local combo', false)
   followPoint = createCheckbox('Follow Points', false)
   approachSwitch = createCheckbox('Approach Circle', false)
   g1 = createColorPicker('#ffffff')
@@ -39,6 +40,7 @@ function setup() {
   })
   approachOpacity.changed(() => draw())
   gradiant.changed(() => draw())
+  localCombo.changed(() => draw())
   followPoint.changed(() => draw())
   approachSwitch.changed(() => draw())
   // g1.input(() => draw())
@@ -57,7 +59,8 @@ function draw() {
   let prev = null
   activeObjects.forEach((obj, i) => {
     let combo = findCombo(newCombo, obj.time);
-    if (followPoint.checked() && prev && prev[2] == combo.color) {
+    // Draw follow points for seperate combo chunks, unless localCombo is checked.
+    if (followPoint.checked() && prev && (prev[2] == combo.color || localCombo.checked())) {
       strokeWeight(6);
       stroke(color(162, 163, 219, 100));
 
@@ -110,7 +113,7 @@ function draw() {
     }
 
     // Calculate the combo number as a string
-    let comboStr = obj.combo.toString();
+    let comboStr = localCombo.checked() ? (i + 1).toString(): obj.combo.toString();
 
     // Calculate the spacing between digits based on hitCircleOverlap and the width of the number images (149)
     let spacing = r - (hitCircleOverlap * r / 149); // Scale hitCircleOverlap based on r
