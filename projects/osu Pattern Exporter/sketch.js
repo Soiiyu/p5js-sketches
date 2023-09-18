@@ -101,9 +101,9 @@ function draw() {
       sliderCanvas = createGraphics(width, height)
 
       sliderCanvas.stroke(82, 84, 128)
-      drawSlider(obj.sliderTicks, r)
+      drawSlider(obj.sliderTicks, r, obj.sliderDist)
       sliderCanvas.stroke(25, 22, 30)
-      drawSlider(obj.sliderTicks, r * 0.885)
+      drawSlider(obj.sliderTicks, r * 0.885, obj.sliderDist)
 
       tint(255, circleAlpha * 0.75);
       image(sliderCanvas, width * 0.5, height * 0.5)
@@ -167,7 +167,7 @@ function handleFile(file) {
     .split("\n")
     .filter((l) => l !== "")
     .map((l) => {
-      let [x, y, time, type, _, sliderTicks] = l.split(",");
+      let [x, y, time, type, _, sliderTicks, __, sliderDist] = l.split(",");
       [x, y, time] = [x, y, time].map((n) => parseInt(n));
       let newCombo = (type & 4) == 4;
       if ((type & 1) == 1) type = "circle";
@@ -184,7 +184,7 @@ function handleFile(file) {
       y += approachMax / 2;
 
       counter++
-      return { x, y, time, type, combo, newCombo, sliderTicks };
+      return { x, y, time, type, combo, newCombo, sliderTicks, sliderDist };
     });
   newCombo = hitobjects.reduce(
     (acc, curr, i) => {
@@ -233,7 +233,7 @@ let lerp2 = (t, p1, p2) => (1 - t) * p1 + t * p2;
 let reduce = (t, p1, p2, ...ps) => ps.length > 0 ? [lerp2(t, p1, p2), ...reduce(t, p2, ...ps)] : [lerp2(t, p1, p2)];
 let deCasteljau = (t, ps) => ps.length > 1 ? deCasteljau(t, reduce(t, ...ps)) : ps[0];
 
-function drawBezier(x, y) {
+function drawBezier(x, y, totalDist, targetDist) {
   // console.log(x, y)
 
   // Set the starting point for the bezier curve
@@ -247,16 +247,18 @@ function drawBezier(x, y) {
 
     let x2 = deCasteljau(t, x);
     let y2 = deCasteljau(t, y);
+    distance += dist(x1, y1, x2, y2)
+    if (totalDist + distance >= targetDist) break
+
     sliderCanvas.line(x1, y1, x2, y2);
 
-    distance += dist(x1, y1, x2, y2)
     x1 = x2;
     y1 = y2;
   }
   return distance
 }
 
-function drawSlider(pointsString, radius) {
+function drawSlider(pointsString, radius, targetDist) {
   sliderCanvas.strokeWeight(radius)
 
   let points = pointsString.split('|')
@@ -273,13 +275,13 @@ function drawSlider(pointsString, radius) {
     currentSlice.push(p)
   }
   // offset by approachMax
-  slices = [...slices.map(p => p.map(pp => pp.split(':').map(n => parseFloat(n)))), currentSlice.map(p => p.split(':').map(n => parseFloat(n) + (approachMax / 2)))]
+  slices = [...slices.map(p => p.map(pp => pp.split(':').map(n => parseFloat(n) + (approachMax / 2)))), currentSlice.map(p => p.split(':').map(n => parseFloat(n) + (approachMax / 2)))]
 
   let distance = 0
   for (let slice of slices) {
     let x = slice.map(p => p[0])
     let y = slice.map(p => p[1])
-    distance += drawBezier(x, y)
+    distance += drawBezier(x, y, distance, targetDist)
   }
   // console.log(slices)
   console.log(distance)
