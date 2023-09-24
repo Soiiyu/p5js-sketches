@@ -1,4 +1,4 @@
-let input, map, hitobjects, cs, start, end, loadMap, colorOffset, newCombo, gradiant, approachSwitch, followPoint, localCombo, g1, g2, approachOpacity;
+let input, map, hitobjects, cs, start, end, loadMap, colorOffset, newCombo, gradiant, approachSwitch, followPoint, localCombo, g1, g2, approachOpacity, fadeToggle, fadeStart, fadeEnd;
 let hitcircle, overlay, numbers, approach, sliderCanvas;
 let colors = [
   [255, 242, 140],
@@ -28,6 +28,10 @@ function setup() {
   localCombo = createCheckbox('Local combo', false)
   followPoint = createCheckbox('Follow Points', false)
   approachSwitch = createCheckbox('Approach Circle', false)
+  fadeToggle = createCheckbox('Fade circles', true)
+  fadeStart = createSlider(0, 255, 190)
+  fadeEnd = createSlider(0, 255, 0)
+  createElement('br')
   g1 = createColorPicker('#ffffff')
   g2 = createColorPicker('#000000')
   button.mousePressed(() => saveCanvas(c, `${imgName}.png`))
@@ -43,6 +47,9 @@ function setup() {
   localCombo.changed(() => draw())
   followPoint.changed(() => draw())
   approachSwitch.changed(() => draw())
+  fadeToggle.changed(() => draw())
+  fadeStart.changed(() => draw())
+  fadeEnd.changed(() => draw())
   // g1.input(() => draw())
   // g2.input(() => draw())
 
@@ -97,7 +104,9 @@ function draw() {
   activeObjects.forEach((obj, i) => {
     let combo = findCombo(newCombo, obj.time);
     let ratio = i / (activeObjects.length - 1);
-    let circleAlpha = round(ratio * 65 + 190);
+    let circleAlpha = round(ratio * (255 - fadeStart.value()) + fadeStart.value());
+
+    if(!fadeToggle.checked()) circleAlpha = 255
 
     // Draw slider
     if (obj.type == 'slider') {
