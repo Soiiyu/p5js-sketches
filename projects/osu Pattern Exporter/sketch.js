@@ -1,5 +1,5 @@
 // Elements and Inputs
-let input, saveImage, start, end, loadMap, colorOffset, gradiant, approachSwitch, followPoint, localCombo, g1, g2, approachOpacity, fadeToggle, fadeStart, fadeEnd;
+let input, saveImage, start, end, loadMap, colorOffset, gradiant, approachSwitch, followPoint, localCombo, g1, g2, approachOpacity, fadeToggle, fadeStart, fadeEnd, overlap;
 
 // Tracking variables
 let hitobjects, timePoints, cs, mapLength, newCombo;
@@ -91,10 +91,11 @@ function setup() {
 				}
 			});
 
-			// Draw circles and sliders
-			activeObjects.forEach((obj, i) => {
+			// Draw circles and sliders, reverse based on overlap selection
+			const orderedObjects = !overlap.checked() ? activeObjects : activeObjects.slice().reverse();
+			orderedObjects.forEach((obj, i) => {
 				const combo = findCombo(newCombo, obj.time);
-				const ratio = i / (activeObjects.length - 1);
+				const ratio = overlap.checked() ? (1 - (i / (orderedObjects.length - 1))) : (i / (orderedObjects.length - 1));
 				const circleAlpha = fadeToggle.checked() ? round(ratio * (255 - fadeStart.value()) + fadeStart.value()) : 255;
 
 				// Draw slider body in a graphic and add to the playfield
@@ -159,9 +160,11 @@ function setup() {
 
 			if (timePoints) {
 				// Preview point
-				const previewX = map(timePoints.previewTime, 0, mapLength, start.x, end.x)
-				sketch.stroke(255, 233, 0)
-				sketch.line(previewX, 0, previewX, sketch.height)
+				if(timePoints.previewTime != -1) {
+					const previewX = map(timePoints.previewTime, 0, mapLength, start.x, end.x)
+					sketch.stroke(255, 233, 0)
+					sketch.line(previewX, 0, previewX, sketch.height)
+				}
 			}
 		}
 	})
@@ -175,6 +178,7 @@ function setup() {
 	localCombo = createCheckbox('Local combo', false)
 	followPoint = createCheckbox('Follow Points', true)
 	approachSwitch = createCheckbox('Approach Circle', false)
+	overlap = createCheckbox('Overlap', true)
 	fadeToggle = createCheckbox('Fade circles', true)
 	fadeStart = createSlider(0, 255, 190)
 	fadeEnd = createSlider(0, 255, 0)
@@ -195,6 +199,7 @@ function setup() {
 	localCombo.changed(() => playfield.draw())
 	followPoint.changed(() => playfield.draw())
 	approachSwitch.changed(() => playfield.draw())
+	overlap.changed(() => playfield.draw())
 	fadeToggle.changed(() => playfield.draw())
 	fadeStart.changed(() => playfield.draw())
 	fadeEnd.changed(() => playfield.draw())
