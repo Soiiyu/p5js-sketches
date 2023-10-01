@@ -1,5 +1,6 @@
-let input, map, hitobjects, cs, start, end, loadMap, colorOffset, newCombo, gradiant, approachSwitch, followPoint, localCombo, g1, g2, approachOpacity, fadeToggle, fadeStart, fadeEnd;
+let input, hitobjects, timePoints, cs, mapLength, start, end, loadMap, colorOffset, newCombo, gradiant, approachSwitch, followPoint, localCombo, g1, g2, approachOpacity, fadeToggle, fadeStart, fadeEnd;
 let hitcircle, overlay, numbers, approach, sliderCanvas;
+let playfield, timeline;
 let colors = [
   [255, 242, 140],
   [101, 252, 171],
@@ -9,6 +10,7 @@ let colors = [
 let hitCircleOverlap = 114; // in your skin.ini
 let defaultWidth = 149; // regular size, not @2x
 let approachMax = 240;
+let timelinePadding = 20;
 let imgName = 'image'
 
 function preload() {
@@ -19,7 +21,144 @@ function preload() {
 }
 
 function setup() {
-  let c = createCanvas(512 + approachMax, 384 + approachMax);
+  noCanvas()
+  playfield = new p5((sketch) => {
+    sketch.setup = () => {
+      sketch.createCanvas(512 + approachMax, 384 + approachMax)
+    }
+    sketch.draw = () => {
+      console.log(sketch.width, sketch.height)
+      sketch.clear();
+      sketch.imageMode(CENTER);
+      if (!hitobjects) return;
+      let r = 109 - 9 * cs;
+      let activeObjects = hitobjects.filter(
+        (obj) => obj.time >= start.value() && obj.time <= end.value()
+      );
+      let prev = null
+      activeObjects.forEach((obj, i) => {
+        let combo = findCombo(newCombo, obj.time);
+        // Draw follow points for seperate combo chunks, unless localCombo is checked.
+        if (followPoint.checked() && prev && (prev[2] == combo.color || localCombo.checked())) {
+          sketch.strokeWeight(6);
+          sketch.stroke(color(162, 163, 219, 100));
+
+          // Calculate the direction vector from the previous circle to the current circle
+          let direction = createVector(obj.x - prev[0], obj.y - prev[1]);
+
+          // Calculate the length of the direction vector
+          let distance = direction.mag();
+
+          // Normalize the direction vector and scale it to be just inside the radius of the current circle
+          direction.normalize();
+          direction.mult(r / 2); // Adjust this factor for the desired length
+
+          // Calculate the new starting and ending points of the line
+          let startX = prev[0] + direction.x;
+          let startY = prev[1] + direction.y;
+          let endX = obj.x - direction.x;
+          let endY = obj.y - direction.y;
+
+          sketch.line(startX, startY, endX, endY);
+        }
+        prev = [obj.x, obj.y, combo.color]
+        let ratio = i / (activeObjects.length - 1);
+        let c = gradiant.checked() ? lerpColor(g1.color(), g2.color(), ratio) : color(...colors[combo.color])
+        c.setAlpha(approachOpacity.value())
+        sketch.strokeWeight(2 * ratio + 2);
+        sketch.stroke(c);
+        sketch.noFill();
+        if (approachSwitch.checked()) {
+          let approach = r * ratio + r * 1.2;
+          sketch.circle(obj.x, obj.y, approach);
+        }
+      });
+      activeObjects.forEach((obj, i) => {
+        let combo = findCombo(newCombo, obj.time);
+        let ratio = i / (activeObjects.length - 1);
+        let circleAlpha = round(ratio * (255 - fadeStart.value()) + fadeStart.value());
+
+        if (!fadeToggle.checked()) circleAlpha = 255
+
+        // Draw slider
+        if (obj.type == 'slider') {
+          sliderCanvas = createGraphics(sketch.width, sketch.height)
+
+          sliderCanvas.stroke(82, 84, 128)
+          drawSlider(obj.sliderTicks, r, obj.sliderDist)
+          sliderCanvas.stroke(25, 22, 30)
+          drawSlider(obj.sliderTicks, r * 0.885, obj.sliderDist)
+
+          sketch.tint(255, circleAlpha * 0.75);
+          sketch.image(sliderCanvas, sketch.width * 0.5, sketch.height * 0.5)
+        }
+
+        // Calculate the combo number as a string
+        let comboStr = localCombo.checked() ? (i + 1).toString() : obj.combo.toString();
+
+        // Calculate the spacing between digits based on hitCircleOverlap and the width of the number images (149)
+        let spacing = r - (hitCircleOverlap * r / 149); // Scale hitCircleOverlap based on r
+
+        // Calculate the width of each digit image
+        let digitWidth = r; // Set digit width to r
+
+        // Calculate the total width needed for all digits
+        let totalWidth = (comboStr.length - 1) * spacing;
+
+        // Calculate the starting x-coordinate for the digits
+        let startX = obj.x - totalWidth / 2;
+
+        let c = gradiant.checked() ? lerpColor(g1.color(), g2.color(), ratio) : color(...colors[combo.color])
+
+        sketch.tint(red(c), green(c), blue(c), circleAlpha);
+        sketch.image(hitcircle, obj.x, obj.y, r, r);
+        sketch.tint(255, circleAlpha);
+        sketch.image(overlay, obj.x, obj.y, r, r);
+
+        // Display combo numbers over the circle
+        for (let j = 0; j < comboStr.length; j++) {
+          let digitIndex = int(comboStr.charAt(j)); // Get the digit at position j
+          let digitX = startX + j * spacing; // Calculate the x-coordinate for the digit
+          let digitY = obj.y; // Use the same y-coordinate as the circle
+
+          // Draw the digit image from the numbers array
+          sketch.image(numbers[digitIndex], digitX, digitY, r, r);
+        }
+      });
+
+
+      // noLoop();
+    }
+
+    sketch.noLoop()
+  })
+
+  timeline = new p5((sketch) => {
+    sketch.setup = () => {
+      sketch.createCanvas(512 + approachMax, 50)
+    }
+
+    sketch.draw = () => {
+      sketch.background(46, 46, 46)
+      
+      // Timeline middle line
+      const start = createVector(timelinePadding, sketch.height * 0.5)
+      const end = createVector(sketch.width - timelinePadding, sketch.height * 0.5)
+
+      sketch.stroke(255, 255, 255)
+      sketch.strokeWeight(2)
+      sketch.line(start.x, start.y, end.x, end.y)
+
+      if(timePoints) {
+        // Preview point
+        const previewX = map(timePoints.previewTime, 0, mapLength, start.x, end.x)
+        // console.log(timePoints, mapLength, previewX)
+        sketch.stroke(255, 233, 0)
+        sketch.line(previewX, 0, previewX, sketch.height)
+      }
+    }
+  })
+
   input = createFileInput(handleFile);
   let button = createButton('Save Image')
   colorOffset = createButton('Color Offset')
@@ -34,146 +173,52 @@ function setup() {
   createElement('br')
   g1 = createColorPicker('#ffffff')
   g2 = createColorPicker('#000000')
-  button.mousePressed(() => saveCanvas(c, `${imgName}.png`))
+  button.mousePressed(() => saveCanvas(playfield, `${imgName}.png`))
   colorOffset.mousePressed(() => {
     newCombo.map(nc => {
       nc.color = (nc.color + 1) % colors.length
       return nc
     })
-    draw()
+    playfield.draw()
   })
-  approachOpacity.changed(() => draw())
-  gradiant.changed(() => draw())
-  localCombo.changed(() => draw())
-  followPoint.changed(() => draw())
-  approachSwitch.changed(() => draw())
-  fadeToggle.changed(() => draw())
-  fadeStart.changed(() => draw())
-  fadeEnd.changed(() => draw())
+  approachOpacity.changed(() => playfield.draw())
+  gradiant.changed(() => playfield.draw())
+  localCombo.changed(() => playfield.draw())
+  followPoint.changed(() => playfield.draw())
+  approachSwitch.changed(() => playfield.draw())
+  fadeToggle.changed(() => playfield.draw())
+  fadeStart.changed(() => playfield.draw())
+  fadeEnd.changed(() => playfield.draw())
   // g1.input(() => draw())
   // g2.input(() => draw())
 
 }
 
-function draw() {
-  clear();
-  imageMode(CENTER);
-  if (!hitobjects) return;
-  let r = 109 - 9 * cs;
-  let activeObjects = hitobjects.filter(
-    (obj) => obj.time >= start.value() && obj.time <= end.value()
-  );
-  let prev = null
-  activeObjects.forEach((obj, i) => {
-    let combo = findCombo(newCombo, obj.time);
-    // Draw follow points for seperate combo chunks, unless localCombo is checked.
-    if (followPoint.checked() && prev && (prev[2] == combo.color || localCombo.checked())) {
-      strokeWeight(6);
-      stroke(color(162, 163, 219, 100));
-
-      // Calculate the direction vector from the previous circle to the current circle
-      let direction = createVector(obj.x - prev[0], obj.y - prev[1]);
-
-      // Calculate the length of the direction vector
-      let distance = direction.mag();
-
-      // Normalize the direction vector and scale it to be just inside the radius of the current circle
-      direction.normalize();
-      direction.mult(r / 2); // Adjust this factor for the desired length
-
-      // Calculate the new starting and ending points of the line
-      let startX = prev[0] + direction.x;
-      let startY = prev[1] + direction.y;
-      let endX = obj.x - direction.x;
-      let endY = obj.y - direction.y;
-
-      line(startX, startY, endX, endY);
-    }
-    prev = [obj.x, obj.y, combo.color]
-    let ratio = i / (activeObjects.length - 1);
-    let c = gradiant.checked() ? lerpColor(g1.color(), g2.color(), ratio) : color(...colors[combo.color])
-    c.setAlpha(approachOpacity.value())
-    strokeWeight(2 * ratio + 2);
-    stroke(c);
-    noFill();
-    if (approachSwitch.checked()) {
-      let approach = r * ratio + r * 1.2;
-      circle(obj.x, obj.y, approach);
-    }
-  });
-  activeObjects.forEach((obj, i) => {
-    let combo = findCombo(newCombo, obj.time);
-    let ratio = i / (activeObjects.length - 1);
-    let circleAlpha = round(ratio * (255 - fadeStart.value()) + fadeStart.value());
-
-    if(!fadeToggle.checked()) circleAlpha = 255
-
-    // Draw slider
-    if (obj.type == 'slider') {
-      sliderCanvas = createGraphics(width, height)
-
-      sliderCanvas.stroke(82, 84, 128)
-      drawSlider(obj.sliderTicks, r, obj.sliderDist)
-      sliderCanvas.stroke(25, 22, 30)
-      drawSlider(obj.sliderTicks, r * 0.885, obj.sliderDist)
-
-      tint(255, circleAlpha * 0.75);
-      image(sliderCanvas, width * 0.5, height * 0.5)
-    }
-
-    // Calculate the combo number as a string
-    let comboStr = localCombo.checked() ? (i + 1).toString(): obj.combo.toString();
-
-    // Calculate the spacing between digits based on hitCircleOverlap and the width of the number images (149)
-    let spacing = r - (hitCircleOverlap * r / 149); // Scale hitCircleOverlap based on r
-
-    // Calculate the width of each digit image
-    let digitWidth = r; // Set digit width to r
-
-    // Calculate the total width needed for all digits
-    let totalWidth = (comboStr.length - 1) * spacing;
-
-    // Calculate the starting x-coordinate for the digits
-    let startX = obj.x - totalWidth / 2;
-
-    let c = gradiant.checked() ? lerpColor(g1.color(), g2.color(), ratio) : color(...colors[combo.color])
-
-    tint(red(c), green(c), blue(c), circleAlpha);
-    image(hitcircle, obj.x, obj.y, r, r);
-    tint(255, circleAlpha);
-    image(overlay, obj.x, obj.y, r, r);
-
-    // Display combo numbers over the circle
-    for (let j = 0; j < comboStr.length; j++) {
-      let digitIndex = int(comboStr.charAt(j)); // Get the digit at position j
-      let digitX = startX + j * spacing; // Calculate the x-coordinate for the digit
-      let digitY = obj.y; // Use the same y-coordinate as the circle
-
-      // Draw the digit image from the numbers array
-      image(numbers[digitIndex], digitX, digitY, r, r);
-    }
-  });
-
-
-  noLoop();
-}
-
 function handleFile(file) {
   // decoding base64 data
-  let map = atob(file.data.split(",")[1]).split("\r\n");
+  let beatmap = atob(file.data.split(",")[1]).split("\r\n");
   imgName = file.name
   cs = parseFloat(
-    map
+    beatmap
       .join("\n")
       .match(/CircleSize:[0-9.]{1,4}/)
       .toString()
       .split("CircleSize:")[1]
   );
 
+  let previewTime = parseInt(
+    beatmap
+      .join('\n')
+      .match(/PreviewTime: [0-9]{1,8}/)
+      .toString()
+      .split('PreviewTime: ')[1]
+  )
+
+  timePoints = { previewTime }
   //x,y,time,type,_,sliderTicks,1,90
   // getting all hitobjects
   let counter = 1;
-  hitobjects = map
+  hitobjects = beatmap
     .join("\n")
     .split("[HitObjects]")[1]
     .split("\n")
@@ -216,14 +261,15 @@ function handleFile(file) {
     { arr: [], spinner: false, color: 1 }
   ).arr;
   console.log(newCombo);
+  mapLength = hitobjects[hitobjects.length - 1].time
   if (!start) {
     start = createInput('0');
-    end = createInput(hitobjects[hitobjects.length - 1].time.toString());
+    end = createInput(mapLength.toString());
     loadMap = createButton('Load Section')
-    loadMap.mousePressed(draw)
+    loadMap.mousePressed(playfield.draw)
   } else {
     start.value('0')
-    end.value(hitobjects[hitobjects.length - 1].time.toString())
+    end.value(mapLength.toString())
   }
   // start.input(draw);
   // end.input(draw);
