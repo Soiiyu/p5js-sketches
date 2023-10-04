@@ -20,6 +20,8 @@ const comboColors = [
 const hitCircleOverlap = 114; // in your skin.ini
 const defaultWidth = 149; // regular size, not @2x
 const approachMax = 240; // Approach circle's max size
+const kiaiSize = 0.25 // % of the timeline's height
+const breakSize = 0.20
 
 const timelinePadding = 20;
 let imgName = 'image'
@@ -39,6 +41,7 @@ function setup() {
 		sketch.setup = () => {
 			sketch.createCanvas(512 + approachMax, 384 + approachMax)
 		}
+
 		sketch.draw = () => {
 			sketch.clear();
 			sketch.imageMode(CENTER);
@@ -159,9 +162,49 @@ function setup() {
 			sketch.line(start.x, start.y, end.x, end.y)
 
 			if (timePoints) {
+				// Timing points
+				sketch.strokeWeight(1)
+				sketch.stroke(255, 0, 0)
+				timePoints.uninherited.forEach(time => {
+					const x = map(time, 0, mapLength, start.x, end.x)
+					sketch.line(x, 0, x, sketch.height * 0.5)
+				})
+				sketch.stroke(140, 230, 37)
+				timePoints.inherited.forEach(time => {
+					const x = map(time, 0, mapLength, start.x, end.x)
+					sketch.line(x, 0, x, sketch.height * 0.5)
+				})
+
+				// Bookmarks
+				sketch.stroke(23, 184, 252)
+				timePoints.bookmarks.forEach(time => {
+					const x = map(time, 0, mapLength, start.x, end.x)
+					sketch.line(x, sketch.height * 0.5, x, sketch.height)
+				})
+
+				// Kiai
+				sketch.fill(252, 157, 3, 127)
+				sketch.noStroke()
+				timePoints.kiai.forEach(({startTime, endTime}) => {
+					const kiaiStart = map(startTime, 0, mapLength, start.x, end.x)
+					const kiaiEnd = map(endTime, 0, mapLength, start.x, end.x)
+
+					sketch.rect(kiaiStart, sketch.height * 0.5 - sketch.height * kiaiSize * 0.5, kiaiEnd - kiaiStart, sketch.height * kiaiSize)
+				})
+
+				// Breaks
+				sketch.fill(255, 255, 255, 127)
+				timePoints.breaks.forEach(({startTime, endTime}) => {
+					const breakStart = map(startTime, 0, mapLength, start.x, end.x)
+					const breakEnd = map(endTime, 0, mapLength, start.x, end.x)
+
+					sketch.rect(breakStart, sketch.height * 0.5 - sketch.height * breakSize * 0.5, breakEnd - breakStart, sketch.height * breakSize)
+				})
+
 				// Preview point
-				if(timePoints.previewTime != -1) {
+				if (timePoints.previewTime != -1) {
 					const previewX = map(timePoints.previewTime, 0, mapLength, start.x, end.x)
+					sketch.strokeWeight(2)
 					sketch.stroke(255, 233, 0)
 					sketch.line(previewX, 0, previewX, sketch.height)
 				}
@@ -219,7 +262,16 @@ function handleFile(file) {
 			.split("CircleSize:")[1]
 	);
 
-	const previewTime = parseInt(
+	timePoints = {
+		breaks: [],
+		inherited: [],
+		uninherited: [],
+		kiai: [],
+		bookmarks: []
+	}
+
+	// Preview points
+	timePoints.previewTime = parseInt(
 		beatmap
 			.join('\n')
 			.match(/PreviewTime: [0-9]{1,8}/)
@@ -227,7 +279,62 @@ function handleFile(file) {
 			.split('PreviewTime: ')[1]
 	)
 
-	timePoints = { previewTime }
+	// Bookmarks
+	const bookmarksIndex = beatmap.findIndex(line => line.startsWith("Bookmarks: "))
+	if (bookmarksIndex !== -1) {
+		timePoints.bookmarks = beatmap[bookmarksIndex].substring("Bookmarks: ".length).split(',').map(time => parseInt(time))
+	}
+
+	// Breaks and Timing points
+	let isBreaks = false
+	let isTiming = false
+	let kiai = false
+	for (let i = 0; i < beatmap.length; i++) {
+		switch (beatmap[i]) {
+			case "[TimingPoints]":
+				isTiming = true
+				break
+			case "//Break Periods":
+				isBreaks = true
+				break
+			case "":
+				if (isTiming) isTiming = false
+				if (isBreaks) isBreaks = false
+				break
+			default:
+				if (isBreaks && beatmap[i].startsWith('//')) isBreaks = false
+				break
+		}
+
+		if (isBreaks && beatmap[i] !== "//Break Periods") {
+			const [breakVal, startTime, endTime] = beatmap[i].split(',')
+			timePoints.breaks.push({startTime, endTime})
+		}
+
+		if (isTiming && beatmap[i] !== "[TimingPoints]") {
+			const [time, beatLength, meter, sampleSet, sampleIndex, volume, uninherited, effects] = beatmap[i].split(',')
+
+			// Seperate Inherited and uninherited timing points
+			if (uninherited == 1) timePoints.uninherited.push(time)
+			else timePoints.inherited.push(time)
+
+			// Kiai
+			const prev = timePoints.kiai[timePoints.kiai.length - 1]
+			if (effects == 1) {
+				if (!prev || !kiai) {
+					kiai = true
+					timePoints.kiai.push({ startTime: parseInt(time), endTime: undefined })
+				} else {
+					prev.endTime = parseInt(time)
+				}
+			} else if (prev && kiai) {
+				prev.endTime = parseInt(time)
+				kiai = false
+			}
+		}
+	}
+
+	console.log(timePoints)
 
 	// Getting all hitobjects and saving them in the `hitobjects` array
 	let counter = 1;
