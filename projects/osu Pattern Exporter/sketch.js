@@ -106,10 +106,11 @@ function setup() {
 					sliderCanvas = createGraphics(sketch.width, sketch.height)
 
 					// Draw twice, first the outline, then the body
+					sliderCanvas.noFill()
 					sliderCanvas.stroke(82, 84, 128)
-					drawSlider(obj.sliderTicks, r, obj.sliderDist)
+					drawSlider(obj.sliderTicks, r, obj.sliderDist, obj.sliderType)
 					sliderCanvas.stroke(25, 22, 30)
-					drawSlider(obj.sliderTicks, r * 0.885, obj.sliderDist)
+					drawSlider(obj.sliderTicks, r * 0.885, obj.sliderDist, obj.sliderType)
 
 					sketch.tint(255, circleAlpha * 0.75);
 					sketch.image(sliderCanvas, sketch.width * 0.5, sketch.height * 0.5)
@@ -123,8 +124,8 @@ function setup() {
 				sketch.tint(255, circleAlpha);
 				sketch.image(overlay, obj.x, obj.y, r, r);
 
-				// Draw combo numbers
-				const comboStr = localCombo.checked() ? (i + 1).toString() : obj.combo.toString();
+				// Draw combo numbers and flip order based on overlap
+				const comboStr = localCombo.checked() ? (overlap.checked() ? (orderedObjects.length - i) : (i + 1)).toString() : obj.combo.toString();
 
 				// Calculate the spacing between digits, total width and starting offset
 				const spacing = r - (hitCircleOverlap * r / 149); // Scale hitCircleOverlap based on r
@@ -185,7 +186,7 @@ function setup() {
 				// Kiai
 				sketch.fill(252, 157, 3, 127)
 				sketch.noStroke()
-				timePoints.kiai.forEach(({startTime, endTime}) => {
+				timePoints.kiai.forEach(({ startTime, endTime }) => {
 					const kiaiStart = map(startTime, 0, mapLength, start.x, end.x)
 					const kiaiEnd = map(endTime, 0, mapLength, start.x, end.x)
 
@@ -194,7 +195,7 @@ function setup() {
 
 				// Breaks
 				sketch.fill(255, 255, 255, 127)
-				timePoints.breaks.forEach(({startTime, endTime}) => {
+				timePoints.breaks.forEach(({ startTime, endTime }) => {
 					const breakStart = map(startTime, 0, mapLength, start.x, end.x)
 					const breakEnd = map(endTime, 0, mapLength, start.x, end.x)
 
@@ -308,7 +309,7 @@ function handleFile(file) {
 
 		if (isBreaks && beatmap[i] !== "//Break Periods") {
 			const [breakVal, startTime, endTime] = beatmap[i].split(',')
-			timePoints.breaks.push({startTime, endTime})
+			timePoints.breaks.push({ startTime, endTime })
 		}
 
 		if (isTiming && beatmap[i] !== "[TimingPoints]") {
@@ -347,12 +348,15 @@ function handleFile(file) {
 			let [x, y, time, type, _, sliderTicks, __, sliderDist] = l.split(",");
 			[x, y, time] = [x, y, time].map((n) => parseInt(n));
 
+			let sliderType = undefined
+
 			// Track what type the object is, and if it's a new combo
 			let newCombo = (type & 4) == 4;
 			if ((type & 1) == 1) type = "circle";
 			else if ((type & 8) == 8) type = "spinner";
 			else if ((type & 2) == 2) {
 				type = "slider";
+				sliderType = sliderTicks.charAt(0)
 				sliderTicks = `${x}:${y}|${sliderTicks.substring(2)}`
 			}
 
@@ -364,7 +368,7 @@ function handleFile(file) {
 			y += approachMax / 2;
 
 			counter++
-			return { x, y, time, type, combo, newCombo, sliderTicks, sliderDist };
+			return { x, y, time, type, combo, newCombo, sliderTicks, sliderDist, sliderType };
 		});
 
 	// Create an array for new combos and track their color	
@@ -440,29 +444,68 @@ function drawBezier(x, y, totalDist, targetDist) {
 	return distance
 }
 
-function drawSlider(pointsString, radius, targetDist) {
+function drawSlider(pointsString, radius, targetDist, type) {
 	sliderCanvas.strokeWeight(radius)
 
 	// Split slices of the slider
 	let points = pointsString.split('|')
-	let slices = []
 
-	let currentSlice = []
-	for (let p of points) {
-		if (currentSlice.length > 0 && currentSlice[currentSlice.length - 1] == p) {
-			slices.push(currentSlice)
-			currentSlice = []
-		}
-		currentSlice.push(p)
-	}
-	// Merge slices to an array and offset by approachMax
-	slices = [...slices.map(p => p.map(pp => pp.split(':').map(n => parseFloat(n) + (approachMax / 2)))), currentSlice.map(p => p.split(':').map(n => parseFloat(n) + (approachMax / 2)))]
+	switch (type) {
+		case "P": // Draw Pass-through circle slider
+			// Parse points' coordinates and create vectors
+			const [p1, p2, p3] = points.map(point => createVector(...point.split(':').map(p => parseFloat(p) + (approachMax / 2))));
 
-	// Draw each slice seperately while keeping track of the total distance
-	let distance = 0
-	for (let slice of slices) {
-		let x = slice.map(p => p[0])
-		let y = slice.map(p => p[1])
-		distance += drawBezier(x, y, distance, targetDist)
+			const center = calcCenter(p1, p2, p3)
+
+			const circleRadius = dist(p1.x, p1.y, center.x, center.y);
+			let angle = targetDist / (circleRadius);
+			
+			let startAngle = atan2(p1.y - center.y, p1.x - center.x);
+			let endAngle = startAngle + angle
+
+			// Flip the direction of the arc
+			if (isLeft(p1, p2, p3)) {
+				[startAngle, endAngle] = [endAngle, startAngle]
+				startAngle = endAngle - angle
+			}
+
+			sliderCanvas.arc(center.x, center.y, circleRadius * 2, circleRadius * 2, startAngle, endAngle)
+			console.log(p1, p2, p3, center, circleRadius, angle, startAngle, endAngle, isLeft(p1, p2, p3))
+
+			break;
+
+		default: // Draw a bezier slider otherwise
+			let slices = []
+
+			let currentSlice = []
+			for (let p of points) {
+				if (currentSlice.length > 0 && currentSlice[currentSlice.length - 1] == p) {
+					slices.push(currentSlice)
+					currentSlice = []
+				}
+				currentSlice.push(p)
+			}
+			// Merge slices to an array and offset by approachMax
+			slices = [...slices.map(p => p.map(pp => pp.split(':').map(n => parseFloat(n) + (approachMax / 2)))), currentSlice.map(p => p.split(':').map(n => parseFloat(n) + (approachMax / 2)))]
+
+			// Draw each slice seperately while keeping track of the total distance
+			let distance = 0
+			for (let slice of slices) {
+				let x = slice.map(p => p[0])
+				let y = slice.map(p => p[1])
+				distance += drawBezier(x, y, distance, targetDist)
+			}
+			break;
 	}
+}
+
+function calcCenter(a, b, c) {
+	const D = 2 * (a.x * (b.y - c.y) + b.x * (c.y - a.y) + c.x * (a.y - b.y));
+	const x = ((a.x * a.x + a.y * a.y) * (b.y - c.y) + (b.x * b.x + b.y * b.y) * (c.y - a.y) + (c.x * c.x + c.y * c.y) * (a.y - b.y)) / D;
+	const y = ((a.x * a.x + a.y * a.y) * (c.x - b.x) + (b.x * b.x + b.y * b.y) * (a.x - c.x) + (c.x * c.x + c.y * c.y) * (b.x - a.x)) / D;
+	return createVector(x, y)
+}
+
+function isLeft(a, b, c) {
+	return ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) < 0;
 }
