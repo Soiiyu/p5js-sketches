@@ -48,9 +48,16 @@ function setup() {
 			if (!hitobjects) return;
 			const r = 109 - 9 * cs;
 
+			// Determine if user inputted a timestamp or in milliseconds
+			const startMs = start.value().includes(':') ? toMs(start.value()) : start.value();
+			const endMs = end.value().includes(':') ? toMs(end.value()) : end.value();
+
+			start.value(toTimestamp(startMs));
+			end.value(toTimestamp(endMs));
+
 			// Filter and draw objects that are within the start and end times
 			const activeObjects = hitobjects.filter(
-				(obj) => obj.time >= start.value() && obj.time <= end.value()
+				(obj) => obj.time >= startMs && obj.time <= endMs
 			);
 			let prev = null
 			activeObjects.forEach((obj, i) => {
@@ -203,7 +210,7 @@ function setup() {
 				})
 
 				// Preview point
-				if (timePoints.previewTime != -1) {
+				if (timePoints.previewTime && timePoints.previewTime != -1) {
 					const previewX = map(timePoints.previewTime, 0, mapLength, start.x, end.x)
 					sketch.strokeWeight(2)
 					sketch.stroke(255, 233, 0)
@@ -392,13 +399,13 @@ function handleFile(file) {
 	// Create start and end input fields, or update if they exist
 	mapLength = hitobjects[hitobjects.length - 1].time
 	if (!start) {
-		start = createInput('0');
-		end = createInput(mapLength.toString());
+		start = createInput('00:00:000');
+		end = createInput(toTimestamp(mapLength.toString()));
 		loadMap = createButton('Load Section')
 		loadMap.mousePressed(playfield.draw)
 	} else {
-		start.value('0')
-		end.value(mapLength.toString())
+		start.value('00:00:000')
+		end.value(toTimestamp(mapLength.toString()))
 	}
 }
 
@@ -459,7 +466,7 @@ function drawSlider(pointsString, radius, targetDist, type) {
 
 			const circleRadius = dist(p1.x, p1.y, center.x, center.y);
 			let angle = targetDist / (circleRadius);
-			
+
 			let startAngle = atan2(p1.y - center.y, p1.x - center.x);
 			let endAngle = startAngle + angle
 
@@ -508,4 +515,21 @@ function calcCenter(a, b, c) {
 
 function isLeft(a, b, c) {
 	return ((b.x - a.x) * (c.y - a.y) - (b.y - a.y) * (c.x - a.x)) < 0;
+}
+
+function toTimestamp(ms) {
+	const minutes = Math.floor(ms / 60000)
+	const seconds = Math.floor((ms - (minutes * 60000)) / 1000)
+	const millsec = ms % 1000
+
+	return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}:${millsec.toString().padStart(2, '0')}`
+}
+
+function toMs(timestamp) {
+	const [minutes, seconds, millsec] = timestamp.trim().split(' ')[0].split(/[\.\:]/).map(digit => parseInt(digit))
+
+	// Incase user only inputs seconds and milliseconds (00:12:345 -> 12:345)
+	// Use minutes as seconds, and seconds and milliseconds
+	if(!millsec) return minutes * 1000 + seconds
+	return minutes * 60000 + seconds * 1000 + millsec
 }
