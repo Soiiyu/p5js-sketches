@@ -282,7 +282,7 @@ function handleFile(file) {
 	timePoints.previewTime = parseInt(
 		beatmap
 			.join('\n')
-			.match(/PreviewTime: [0-9]{1,8}/)
+			.match(/PreviewTime: [0-9\-]{1,8}/)
 			.toString()
 			.split('PreviewTime: ')[1]
 	)
