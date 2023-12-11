@@ -8,7 +8,7 @@ let input, withScore, withoutScore, predictions
 let xs = [];
 let ys = [];
 
-let a, b, c, d
+let a, b//, c, d
 
 const normalizeRank = {
 	min: 1,
@@ -45,7 +45,7 @@ function draw() {
 		optimizer.minimize(() => loss(predict(xs), tf.tensor1d(ys)));
 
 		const curveX = [];
-		for(let x = 0; x <= 1; x += 0.05) {
+		for(let x = 0; x <= 1; x += 0.005) {
 			curveX.push(x);
 		}
 
@@ -88,17 +88,24 @@ function loss(pred, lables) {
 function predict(x) {
 	const xs = tf.tensor1d(x)
 	
-	// squared
+	// squared using 3 variables (a,b,c)
 	// const ys = xs.square().mul(a)
 	// 			.add(xs.mul(b))
 	// 			.add(c);
 
-	// cubed
-	const ys = xs.pow(tf.scalar(3)).mul(a)
-				.add(xs.square().mul(b))
-				.add(xs.mul(c))
-				.add(d);
+	// cubed using 4 variables (a,b,c,d)
+	// const ys = xs.pow(tf.scalar(3)).mul(a)
+	// 			.add(xs.square().mul(b))
+	// 			.add(xs.mul(c))
+	// 			.add(d);
 
+	// root using 2 variables
+	// const ys = xs.sqrt().mul(a)
+	// 			.add(b)
+
+	// logarithmic using 2 variables
+	const ys = xs.pow(a).log().mul(tf.scalar(-1))
+				.add(b)
 	return ys
 }
 
