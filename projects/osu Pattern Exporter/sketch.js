@@ -1,6 +1,9 @@
 // Elements and Inputs
 let input, saveImage, start, end, loadMap, colorOffset, gradiant, approachSwitch, followPoint, localCombo, g1, g2, approachOpacity, fadeToggle, fadeStart, fadeEnd, overlap;
 
+// Mods
+let hrButton, ezButton
+
 // Tracking variables
 let hitobjects, timePoints, cs, mapLength, newCombo;
 
@@ -46,7 +49,9 @@ function setup() {
 			sketch.clear();
 			sketch.imageMode(CENTER);
 			if (!hitobjects) return;
-			const r = 109 - 9 * cs;
+			const moddedCs = Math.min(cs * Math.max(1, 1.3 * hrButton.checked()), 10) / Math.max(1, 2 * ezButton.checked())
+			console.log(cs, moddedCs, Math.max(1, 1.3 * hrButton.checked()), Math.max(1, 2 * ezButton.checked()))
+			const r = 109 - 9 * moddedCs;
 
 			// Determine if user inputted a timestamp or in milliseconds
 			const startMs = start.value().includes(':') ? toMs(start.value()) : start.value();
@@ -56,9 +61,18 @@ function setup() {
 			end.value(toTimestamp(endMs));
 
 			// Filter and draw objects that are within the start and end times
-			const activeObjects = hitobjects.filter(
+			const activeObjects = JSON.parse(JSON.stringify(hitobjects)).filter(
 				(obj) => obj.time >= startMs && obj.time <= endMs
-			);
+			).map(obj => { // Flip objects if hardrock is selected
+				obj.y = Math.abs(sketch.height * hrButton.checked() - obj.y)
+				if(obj.type == 'slider') {
+					obj.sliderTicks = obj.sliderTicks.split('|').map(pos => {
+						const [x, y] = pos.split(':')
+						return [x, Math.abs(384 * hrButton.checked() - y)].join(':')
+					}).join('|')
+				}
+				return obj
+			});
 			let prev = null
 			activeObjects.forEach((obj, i) => {
 				const combo = findCombo(newCombo, obj.time);
@@ -236,6 +250,8 @@ function setup() {
 	createElement('br')
 	g1 = createColorPicker('#ffffff')
 	g2 = createColorPicker('#000000')
+	hrButton = createCheckbox('Hardrock', false)
+	ezButton = createCheckbox('Eazy', false)
 
 	saveImage.mousePressed(() => saveCanvas(playfield, `${imgName}.png`))
 	colorOffset.mousePressed(() => {
@@ -254,6 +270,14 @@ function setup() {
 	fadeToggle.changed(() => playfield.draw())
 	fadeStart.changed(() => playfield.draw())
 	fadeEnd.changed(() => playfield.draw())
+	hrButton.changed(() => {
+		if (hrButton.checked() && ezButton.checked()) ezButton.checked(false)
+		playfield.draw()
+	})
+	ezButton.changed(() => {
+		if (ezButton.checked() && hrButton.checked()) hrButton.checked(false)
+		playfield.draw()
+	})
 }
 
 function handleFile(file) {
@@ -530,6 +554,6 @@ function toMs(timestamp) {
 
 	// Incase user only inputs seconds and milliseconds (00:12:345 -> 12:345)
 	// Use minutes as seconds, and seconds and milliseconds
-	if(!millsec) return minutes * 1000 + seconds
+	if (!millsec) return minutes * 1000 + seconds
 	return minutes * 60000 + seconds * 1000 + millsec
 }
