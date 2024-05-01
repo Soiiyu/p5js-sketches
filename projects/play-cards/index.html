@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <!-- use if offline -->
+  <!-- <script src="p5.js"></script> -->
+  <!-- <script src="p5.sound.min.js"></script> -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/p5.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/p5.js/1.4.0/addons/p5.sound.min.js"></script>
+  <link rel="stylesheet" type="text/css" href="style.css">
+  <meta charset="utf-8" />
+
+</head>
+<style>
+  body {
+    font-family: sans-serif;
+    background-color: #212126;
+    color: white;
+    align-items: center;
+  }
+
+  canvas {
+    background-color: #101012;
+  }
+
+  #inputs {
+    margin: 15px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    width: 50%;
+  }
+
+  p {
+    margin: 0.2rem;
+  }
+
+  #toggle-manual {
+    user-select: none;
+  }
+
+  .invisible {
+    display: none;
+  }
+
+  a {
+    color: #c0a3ff;
+    font-size: smaller;
+    margin: 0.5rem;
+  }
+</style>
+
+<body>
+  <div>
+    <div id="inputs">
+      <p>
+        <label for="score-id">Score url / id</label>
+        <input type="text" id="score-id">
+      </p>
+      <button id="load-score">Load Score</button>
+      <h2>-OR-</h2>
+      <span id="toggle-manual">► fill in manually ◄</span>
+      <div id="manual" class="invisible">
+        <p>
+          <label for="player">Player</label>
+          <input type="text" id="player">
+        </p>
+        <p>
+          <label for="profile-pic">Profile pic url / player id</label>
+          <input type="text" id="profile-pic">
+        </p>
+        <p>
+          <label for="rank">Rank</label>
+          <input type="text" id="rank">
+        </p>
+        <p>
+          <label for="total-pp">Total pp</label>
+          <input type="text" id="total-pp">
+        </p>
+        <p>
+          <label for="play-pp">Play pp</label>
+          <input type="text" id="play-pp">
+        </p>
+        <p>
+          <label for="song-Title">Song Title</label>
+          <input type="text" id="song-Title">
+        </p>
+        <p>
+          <label for="difficulty">Difficulty</label>
+          <input type="text" id="difficulty">
+        </p>
+        <p>
+          <label for="background-url">Background url / map id</label>
+          <input type="text" id="background-url">
+        </p>
+        <button id="load-manually">Load Manually</button>
+      </div>
+      <a href="https://github.com/Soiiyu">Made by Soiiyu</a>
+    </div>
+  </div>
+  <script src="sketch.js"></script>
+</body>
+
+</html>
